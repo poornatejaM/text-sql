@@ -12,7 +12,7 @@ from rich.table import Table
 from agent.query_generator import QueryGenerator
 from agent.query_executor import QueryExecutor
 from agent.summarizer import Summarizer
-from agent.config import Config
+from agent.config_settings import Config
 from agent.schema_manager import SchemaManager
 from agent.query_enhancer import QueryEnhancer
 from agent.table_finder import TableFinder

@@ -21,11 +21,24 @@ class Summarizer:
         system_prompt = f"<|start_header_id|>system<|end_header_id|>\n\n{system}<|eot_id|>" if system else ""
         return f"<|begin_of_text|>{system_prompt}<|start_header_id|>user<|end_header_id|>\n\n{user_query}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
     
-    def generate_summary(self, user_query: str, query_output: List[Dict[str, Any]]) -> str:
-        """Generate a natural language summary of query results."""
+    def generate_summary(self, user_query: str, query_output: List[Dict[str, Any]], original_query: str = None) -> str:
+        """
+        Generate a natural language summary of query results.
+        
+        Args:
+            user_query: The enhanced user query
+            query_output: The results of the SQL query
+            original_query: The original user query before enhancement (optional)
+            
+        Returns:
+            str: A natural language summary of the query results
+        """
         try:
             # Clean and format the output for the prompt
             formatted_output = self._format_output_for_prompt(query_output)
+            
+            # Use original query in context if provided
+            query_context = f"Original Question: {original_query}\nEnhanced Question: {user_query}" if original_query else f"Question: {user_query}"
             
             # Create prompt
             summary_prompt = f"""
@@ -34,7 +47,7 @@ class Summarizer:
             Objective: Generate a clear, informative summary of the query results based on the user's question.
 
             Context:
-            User Question: {user_query}
+            {query_context}
             SQL Results: {formatted_output}
 
             Instructions:
@@ -92,4 +105,3 @@ class Summarizer:
                 f.write(f"# Summary for: {user_query}\n\n{summary}")
         except Exception as e:
             logging.warning(f"Failed to save summary: {str(e)}")
-
