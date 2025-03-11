@@ -1,0 +1,3 @@
+lamini
+clickhouse_connect
+python-dotenv

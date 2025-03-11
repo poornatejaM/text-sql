@@ -1,0 +1,57 @@
+Metadata-Version: 2.2
+Name: lamini
+Version: 3.2.12
+Summary: Build on large language models faster
+Author-email: Lamini <info@lamini.ai>
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.7
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: lamini-configuration[yaml]
+Requires-Dist: requests
+Requires-Dist: tqdm
+Requires-Dist: numpy<2.0.0
+Requires-Dist: jsonlines
+Requires-Dist: pandas
+Requires-Dist: azure-storage-blob
+Requires-Dist: scikit-learn
+Requires-Dist: aiohttp
+Requires-Dist: faiss-cpu
+Requires-Dist: openai
+Provides-Extra: index
+Requires-Dist: faiss-cpu; extra == "index"
+Provides-Extra: classifier
+Requires-Dist: scikit-learn; extra == "classifier"
+
+# Lamini
+
+Create your own Generative AI.
+
+This python package is a client + SDK compatible with the Lamini API, documented here: [https://lamini-ai.github.io/](https://lamini-ai.github.io/). For this reason, we recommend that most users stay up-to-date with the most recent stable version of our package available via `pip install --upgrade --force-reinstall lamini`.
+
+## Installation
+
+```sh
+pip install lamini
+```
+
+## Setup your keys
+
+Go to [https://app.lamini.ai/account](https://app.lamini.ai/account) and log in to get your API key.
+
+Create `~/.lamini/configure.yaml` and put a key in it.
+
+```sh
+production:
+    key: "<YOUR-KEY-HERE>"
+```
+
+## Documentation
+
+Package documentation here: [https://lamini-ai.github.io/](https://lamini-ai.github.io/)
+
+## Github
+
+Package source code here: [https://github.com/lamini-ai/lamini](https://github.com/lamini-ai/lamini)

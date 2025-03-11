@@ -1,0 +1,1 @@
+SELECT Product_Category FROM sales_data GROUP BY Product_Category ORDER BY COUNT(Product_Category) DESC LIMIT 1
