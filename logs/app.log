@@ -3,3 +3,5 @@
 2025-03-11 16:09:51,438 - INFO - Executed Query: SELECT Product_Category FROM sales_data GROUP BY Product_Category ORDER BY COUNT(Product_Category) DESC LIMIT 1
 2025-03-11 16:10:27,188 - INFO - Executed Query: SELECT Product_Category FROM sales_data GROUP BY Product_Category ORDER BY COUNT(Product_Category) DESC LIMIT 1
 2025-03-11 16:21:54,460 - INFO - Executed Query: SELECT Product_Category FROM sales_data GROUP BY Product_Category ORDER BY COUNT(Product_Category) DESC LIMIT 1
+2025-03-11 16:29:56,764 - INFO - Executed Query: SELECT Product_Category FROM sales_data GROUP BY Product_Category ORDER BY COUNT(Product_Category) DESC LIMIT 1
+2025-03-11 16:39:38,986 - INFO - Executed Query: SELECT Product_Category FROM sales_data GROUP BY Product_Category ORDER BY COUNT(Product_Category) DESC LIMIT 1
