@@ -1,1 +1,3 @@
-SELECT Product_Category FROM sales_data GROUP BY Product_Category ORDER BY COUNT(Product_Category) DESC LIMIT 1
+-- User Query: which day recorded the most sales
+
+SELECT Sale_Date FROM sales_data GROUP BY Sale_Date ORDER BY sum(Sales_Amount) DESC LIMIT 1

@@ -1,5 +1,5 @@
 import pandas as pd
-from config_settings import get_clickhouse_client
+from agent.config_settings import get_clickhouse_client
 
 # Connect to ClickHouse
 client = get_clickhouse_client()
