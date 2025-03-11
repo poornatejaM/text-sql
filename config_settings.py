@@ -10,9 +10,9 @@ load_dotenv()
 LAMINI_API_KEY = os.getenv("LAMINI_API_KEY")
 
 # ClickHouse Database Credentials
-CLICKHOUSE_HOST = os.getenv("CLICKHOUSE_HOST", "n0barcb92d.ap-south-1.aws.clickhouse.cloud")
-CLICKHOUSE_USER = os.getenv("CLICKHOUSE_USER", "default")
-CLICKHOUSE_PASSWORD = os.getenv("CLICKHOUSE_PASSWORD", "zT05UExfnB~3F")
+CLICKHOUSE_HOST = os.getenv("CLICKHOUSE_HOST")
+CLICKHOUSE_USER = os.getenv("CLICKHOUSE_USER")
+CLICKHOUSE_PASSWORD = os.getenv("CLICKHOUSE_PASSWORD")
 lamini.api_key = LAMINI_API_KEY
 
 llm = lamini.Lamini("meta-llama/Meta-Llama-3.1-8B-Instruct")
