@@ -1,4 +1,3 @@
-# agent/table_finder.py
 import logging
 import lamini
 from typing import List, Dict, Any
@@ -11,6 +10,7 @@ class TableFinder:
         """Initialize with configuration."""
         self.config = config
         self.table_cache = {}
+        self.debug_mode = True  # Set to False in production
         
         # Initialize LLM provider
         if self.config.llm["provider"] == "lamini":
@@ -24,285 +24,153 @@ class TableFinder:
         system_prompt = f"<|start_header_id|>system<|end_header_id|>\n\n{system}<|eot_id|>" if system else ""
         return f"<|begin_of_text|>{system_prompt}<|start_header_id|>user<|end_header_id|>\n\n{user_query}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
     
-    def find_relevant_tables(self, query: str) -> List[Dict[str, Any]]:
+    def get_all_tables(self) -> List[str]:
         """
-        Find relevant tables for a given query.
+        Get a list of all available tables in the database.
+        
+        Returns:
+            List of table names
+        """
+        try:
+            query = "SHOW TABLES"
+            from agent.query_executor import QueryExecutor
+            executor = QueryExecutor(self.config)
+            result = executor.execute_query(query)
+            
+            if not result:
+                raise ValueError("Failed to retrieve tables from database")
+            
+            return [row["name"] for row in result]
+        except Exception as e:
+            if self.debug_mode:
+                logging.error(f"Error fetching tables: {str(e)}")
+            return []
+
+    def get_table_schema(self, table_name: str) -> str:
+        """
+        Get the schema of a specified table.
         
         Args:
-            query: The natural language query
+            table_name: Name of the table
             
         Returns:
-            List of dictionaries with table information, sorted by relevance
+            Formatted schema as a string
         """
+        if table_name in self.table_cache:
+            return self.table_cache[table_name]
+        
         try:
-            # Get all tables if not already cached
-            if not self.table_cache:
-                self._populate_table_cache()
+            # Get table structure from ClickHouse
+            schema_query = f"DESCRIBE TABLE {table_name}"
+            from agent.query_executor import QueryExecutor
+            executor = QueryExecutor(self.config)
+            schema_result = executor.execute_query(schema_query)
             
-            if not self.table_cache:
-                logging.warning("No tables found in database or failed to retrieve tables")
-                return []
+            if not schema_result:
+                raise ValueError(f"Failed to retrieve schema for table {table_name}")
             
-            # Use LLM to rank tables by relevance
-            relevant_tables = self._rank_tables_by_relevance(query)
+            # Format schema information
+            schema_str = "Column Name | Type | Default | Comment | Codec | TTL\n"
+            schema_str += "-----------|------|---------|---------|-------|-----\n"
             
-            return relevant_tables
-        
-        except Exception as e:
-            logging.error(f"Failed to find relevant tables: {str(e)}")
-            return []
-    
-    def _populate_table_cache(self):
-        """Populate cache with tables from the database."""
-        from agent.query_executor import QueryExecutor
-        
-        # Create a query executor
-        executor = QueryExecutor(self.config)
-        
-        # Query to get all tables
-        query = """
-        SELECT 
-            database,
-            name,
-            engine,
-            total_rows,
-            total_bytes,
-            comment
-        FROM 
-            system.tables
-        WHERE 
-            database NOT IN ('system', 'information_schema', 'INFORMATION_SCHEMA')
-        """
-        
-        # Execute query
-        result = executor.execute_query(query)
-        
-        if not result:
-            logging.error("Failed to retrieve tables from database")
-            return
-        
-        # Populate cache
-        for table in result:
-            table_name = table["name"]
-            self.table_cache[table_name] = {
-                "database": table["database"],
-                "name": table_name,
-                "engine": table["engine"],
-                "rows": table["total_rows"],
-                "size_bytes": table["total_bytes"],
-                "description": table.get("comment", "")
-            }
-        
-        # For each table, get column information
-        for table_name in self.table_cache:
-            self._get_table_columns(table_name)
-    
-    def _get_table_columns(self, table_name: str):
-        """Get column information for a table."""
-        from agent.query_executor import QueryExecutor
-        
-        # Create a query executor
-        executor = QueryExecutor(self.config)
-        
-        # Query to get column information
-        query = f"""
-        SELECT 
-            name, 
-            type,
-            comment
-        FROM 
-            system.columns
-        WHERE 
-            table = '{table_name}'
-        """
-        
-        # Execute query
-        result = executor.execute_query(query)
-        
-        if result:
-            self.table_cache[table_name]["columns"] = [
-                {
-                    "name": col["name"],
-                    "type": col["type"],
-                    "description": col.get("comment", "")
-                }
-                for col in result
-            ]
-    
-    def _rank_tables_by_relevance(self, query: str) -> List[Dict[str, Any]]:
-        """Rank tables by relevance to the query using LLM."""
-        # If there are more than 10 tables, use LLM to rank them
-        if len(self.table_cache) > 10:
-            return self._rank_tables_with_llm(query)
-        else:
-            # For fewer tables, rank them using a simpler heuristic approach
-            return self._rank_tables_with_heuristics(query)
-    
-    def _rank_tables_with_heuristics(self, query: str) -> List[Dict[str, Any]]:
-        """Rank tables using simple keyword matching heuristics."""
-        # Extract potential keywords from the query
-        keywords = set(re.findall(r'\b\w+\b', query.lower()))
-        
-        # Remove common stop words
-        stop_words = {'a', 'an', 'the', 'and', 'or', 'but', 'is', 'are', 'was', 
-                     'were', 'be', 'been', 'being', 'in', 'on', 'at', 'to', 'for',
-                     'with', 'by', 'about', 'against', 'between', 'into', 'through',
-                     'during', 'before', 'after', 'above', 'below', 'from', 'up',
-                     'down', 'of', 'off', 'over', 'under', 'again', 'further', 'then',
-                     'once', 'here', 'there', 'when', 'where', 'why', 'how', 'all',
-                     'any', 'both', 'each', 'few', 'more', 'most', 'other', 'some',
-                     'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so', 'than',
-                     'too', 'very', 's', 't', 'can', 'will', 'just', 'don', 'should',
-                     'now', 'what', 'which', 'who', 'whom', 'this', 'that', 'these',
-                     'those', 'i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves',
-                     'you', 'your', 'yours', 'yourself', 'yourselves', 'he', 'him', 'his',
-                     'himself', 'she', 'her', 'hers', 'herself', 'it', 'its', 'itself',
-                     'they', 'them', 'their', 'theirs', 'themselves', 'show', 'get', 'find'}
-        
-        keywords -= stop_words
-        
-        # Score tables based on keyword matches
-        table_scores = []
-        
-        for table_name, table_info in self.table_cache.items():
-            score = 0
-            
-            # Check table name
-            table_words = set(re.findall(r'\b\w+\b', table_name.lower()))
-            score += len(keywords.intersection(table_words)) * 2
-            
-            # Check table description
-            if table_info.get("description"):
-                desc_words = set(re.findall(r'\b\w+\b', table_info["description"].lower()))
-                score += len(keywords.intersection(desc_words))
-            
-            # Check column names and descriptions
-            for column in table_info.get("columns", []):
-                col_name = column["name"].lower()
-                col_words = set(re.findall(r'\b\w+\b', col_name))
-                score += len(keywords.intersection(col_words)) * 1.5
+            for row in schema_result:
+                column_name = row.get("name", '')
+                column_type = row.get("type", '')
+                default_expr = row.get("default_expression", '')
+                comment = row.get("comment", '')
+                codec_expr = row.get("codec_expression", '')
+                ttl_expr = row.get("ttl_expression", '')
                 
-                if column.get("description"):
-                    col_desc_words = set(re.findall(r'\b\w+\b', column["description"].lower()))
-                    score += len(keywords.intersection(col_desc_words)) * 0.5
+                schema_str += f"{column_name} | {column_type} | {default_expr} | {comment} | {codec_expr} | {ttl_expr}\n"
             
-            # Bonus for larger tables with actual data
-            if table_info.get("rows", 0) > 100:
-                score += 0.5
+            # Also get a sample of data
+            try:
+                sample_query = f"SELECT * FROM {table_name} LIMIT 3"
+                sample_result = executor.execute_query(sample_query)
+                
+                if sample_result:
+                    schema_str += f"\nSample data from {table_name}:\n"
+                    cols = [col["name"] for col in schema_result]
+                    schema_str += " | ".join(cols) + "\n"
+                    schema_str += "-" * (len(" | ".join(cols))) + "\n"
+                    
+                    for row in sample_result:
+                        schema_str += " | ".join([str(val) for val in row.values()]) + "\n"
+            except Exception as e:
+                if self.debug_mode:
+                    logging.warning(f"Error getting sample data: {str(e)}")
+                schema_str += f"\nUnable to fetch sample data: {str(e)}\n"
             
-            # Add to results
-            table_scores.append({
-                "name": table_name,
-                "score": score,
-                "description": table_info.get("description", ""),
-                "columns": len(table_info.get("columns", [])),
-                "rows": table_info.get("rows", 0)
-            })
-        
-        # Sort by score (descending)
-        table_scores.sort(key=lambda x: x["score"], reverse=True)
-        
-        # If default table exists and has a reasonable score, prioritize it
-        default_table = self.config.default_table
-        if default_table:
-            for i, table in enumerate(table_scores):
-                if table["name"] == default_table and table["score"] > 0:
-                    # Move to top if has some relevance
-                    if i > 0:
-                        default_table_info = table_scores.pop(i)
-                        table_scores.insert(0, default_table_info)
-                    break
-        
-        # Add the default table if it wasn't found but exists in cache
-        if default_table and default_table in self.table_cache and not any(t["name"] == default_table for t in table_scores):
-            default_info = self.table_cache[default_table]
-            table_scores.insert(0, {
-                "name": default_table,
-                "score": 0.5,  # Low but non-zero score
-                "description": default_info.get("description", "Default table"),
-                "columns": len(default_info.get("columns", [])),
-                "rows": default_info.get("rows", 0)
-            })
-        
-        # Return all tables with a score > 0, or at least one table
-        result = [t for t in table_scores if t["score"] > 0]
-        return result if result else table_scores[:1]
-    
-    def _rank_tables_with_llm(self, query: str) -> List[Dict[str, Any]]:
-        """Rank tables by relevance using LLM."""
-        # Prepare table information for the prompt
-        table_info_str = ""
-        for table_name, info in self.table_cache.items():
-            table_info_str += f"Table: {table_name}\n"
-            table_info_str += f"Description: {info.get('description', 'N/A')}\n"
-            table_info_str += "Columns:\n"
-            
-            # Add column information
-            for col in info.get("columns", []):
-                col_desc = col.get("description", "").strip()
-                col_info = f"- {col['name']} ({col['type']})"
-                if col_desc:
-                    col_info += f": {col_desc}"
-                table_info_str += f"{col_info}\n"
-            
-            table_info_str += "\n"
-        
-        # Create prompt
-        system_prompt = f"""You are a database expert who can identify which tables are most relevant to a natural language query.
-        
-        Given the following database tables and a user query, rank the top 5 most relevant tables for answering the query.
-        
-        Database Tables:
-        {table_info_str}
-        
-        For each table, provide:
-        1. The table name
-        2. A relevance score from 0-10 (10 being most relevant)
-        3. A brief explanation of why the table is relevant
-        
-        Format your response as a JSON array of objects with the following structure:
-        [
-            {{"name": "table_name", "score": 8.5, "reason": "This table contains..."}},
-            ...
-        ]
-        
-        Only include tables that have some relevance to the query (score > 0).
+            # Cache the result
+            self.table_cache[table_name] = schema_str
+            return schema_str
+        except Exception as e:
+            error_msg = f"Error fetching schema for {table_name}: {str(e)}"
+            if self.debug_mode:
+                logging.error(error_msg)
+            return error_msg
+
+    def identify_relevant_tables(self, user_query: str) -> List[Dict[str, Any]]:
         """
+        Identify relevant tables for the user query.
         
-        prompt = self.make_llama_3_prompt(query, system_prompt)
+        Args:
+            user_query: The user's query (rephrased)
+            
+        Returns:
+            List of relevant table names with scores and descriptions
+        """
+        tables = self.get_all_tables()
+        tables_with_schemas = {}
         
-        # Generate rankings
-        result = self.llm.generate(prompt, output_type={"rankings": "list[dict]"}, max_new_tokens=800)
+        # Get schema for each table
+        for table in tables:
+            tables_with_schemas[table] = self.get_table_schema(table)
+        
+        # Format all tables and their schemas for the LLM
+        tables_info = ""
+        for table, schema in tables_with_schemas.items():
+            tables_info += f"Table: {table}\nSchema:\n{schema}\n\n"
+        
+        system_prompt = f"""You are a senior database expert. Based on the following tables and their schemas, 
+        identify which tables are relevant to answering the user's query. 
+        Only return the table names separated by commas. If multiple tables could be joined, list all relevant tables.
+
+        {tables_info}"""
+                
+        prompt = self.make_llama_3_prompt(user_query, system_prompt)
         
         try:
-            rankings = result.get("rankings", [])
+            result = self.llm.generate(
+                prompt, 
+                output_type={"relevant_tables": "str"}, 
+                max_new_tokens=200
+            )
             
-            if not rankings:
-                logging.warning("LLM did not return valid table rankings, using heuristic method instead")
-                return self._rank_tables_with_heuristics(query)
+            relevant_tables_str = result.get("relevant_tables", "")
+            relevant_tables = [t.strip() for t in relevant_tables_str.split(",")]
+            relevant_tables = [t for t in relevant_tables if t in tables]  # Filter out non-existent tables
             
-            # Format the results
-            formatted_rankings = []
-            for rank in rankings:
-                table_name = rank.get("name", "").strip()
-                if table_name in self.table_cache:
-                    formatted_rankings.append({
-                        "name": table_name,
-                        "score": float(rank.get("score", 0)),
-                        "description": rank.get("reason", ""),
-                        "columns": len(self.table_cache[table_name].get("columns", [])),
-                        "rows": self.table_cache[table_name].get("rows", 0)
-                    })
+            if not relevant_tables and tables:
+                # If no relevant tables found but tables exist, use the first table as a fallback
+                relevant_tables = [tables[0]]
             
-            # Sort by score (descending)
-            formatted_rankings.sort(key=lambda x: x["score"], reverse=True)
+            if self.debug_mode:
+                logging.info(f"Identified relevant tables: {', '.join(relevant_tables)}")
             
-            # If no tables were found as relevant, use heuristic method
-            if not formatted_rankings:
-                return self._rank_tables_with_heuristics(query)
+            # Fetch and return detailed information about the relevant tables
+            detailed_tables = []
+            for table in relevant_tables:
+                schema = tables_with_schemas.get(table, {})
+                detailed_tables.append({
+                    "name": table,
+                    "score": 1.0,  # Placeholder score
+                    "description": schema  # Placeholder description
+                })
             
-            return formatted_rankings
-        
+            return detailed_tables
         except Exception as e:
-            logging.error(f"Failed to parse LLM table rankings: {str(e)}")
-            return self._rank_tables_with_heuristics(query)
+            if self.debug_mode:
+                logging.error(f"Error identifying tables: {str(e)}")
+            # Return first table as fallback
+            return [{"name": tables[0], "score": 1.0, "description": ""}] if tables else []

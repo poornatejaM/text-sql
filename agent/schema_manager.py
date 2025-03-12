@@ -8,79 +8,71 @@ class SchemaManager:
         """Initialize with configuration."""
         self.config = config
         self.schema_cache = {}
+        self.debug_mode = True  # Set to False in production
     
-    def get_schema(self, table_name: str) -> Optional[Dict[str, Any]]:
-        """Get schema for a specific table."""
-        # Check cache first
+    def make_llama_3_prompt(self, user_query: str, system: str = "") -> str:
+        """Format a prompt for Llama-3 models."""
+        system_prompt = f"<|start_header_id|>system<|end_header_id|>\n\n{system}<|eot_id|>" if system else ""
+        return f"<|begin_of_text|>{system_prompt}<|start_header_id|>user<|end_header_id|>\n\n{user_query}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
+    
+    def get_table_schema(self, table_name: str) -> Dict[str, Any]:
+        """
+        Get the schema of a specified table.
+        
+        Args:
+            table_name: Name of the table
+            
+        Returns:
+            Dictionary containing the schema
+        """
         if table_name in self.schema_cache:
             return self.schema_cache[table_name]
         
         try:
-            # If table is sales_data, use the default schema
-            if table_name == "sales_data":
-                schema = self._get_sales_data_schema()
-            else:
-                # For other tables, try to fetch schema from database
-                schema = self._fetch_schema_from_db(table_name)
+            # Get table structure from ClickHouse
+            schema_query = f"DESCRIBE TABLE {table_name}"
+            from agent.query_executor import QueryExecutor
+            executor = QueryExecutor(self.config)
+            schema_result = executor.execute_query(schema_query)
             
-            # Cache the schema
+            if not schema_result:
+                raise ValueError(f"Failed to retrieve schema for table {table_name}")
+            
+            # Format schema information
+            schema = {}
+            for row in schema_result:
+                column_name = row.get("name", '')
+                column_type = row.get("type", '')
+                default_expr = row.get("default_expression", '')
+                comment = row.get("comment", '')
+                codec_expr = row.get("codec_expression", '')
+                ttl_expr = row.get("ttl_expression", '')
+                
+                schema[column_name] = {
+                    "type": column_type,
+                    "default_expression": default_expr,
+                    "comment": comment,
+                    "codec_expression": codec_expr,
+                    "ttl_expression": ttl_expr
+                }
+            
+            # Also get a sample of data
+            try:
+                sample_query = f"SELECT * FROM {table_name} LIMIT 3"
+                sample_result = executor.execute_query(sample_query)
+                
+                if sample_result:
+                    schema["sample_data"] = sample_result
+            except Exception as e:
+                if self.debug_mode:
+                    logging.warning(f"Error getting sample data: {str(e)}")
+                schema["sample_data"] = f"Unable to fetch sample data: {str(e)}"
+            
+            # Cache the result
             self.schema_cache[table_name] = schema
             return schema
-        
         except Exception as e:
-            logging.error(f"Failed to get schema for {table_name}: {str(e)}")
-            return None
-    
-    def _get_sales_data_schema(self) -> Dict[str, Any]:
-        """Get hardcoded schema for sales_data table."""
-        return {
-            "Product_ID": {"type": "Int64", "description": "Unique identifier for products"},
-            "Sale_Date": {"type": "Date", "description": "Date of the sale"},
-            "Sales_Rep": {"type": "String", "description": "Name of the sales representative"},
-            "Region": {"type": "String", "description": "Geographic region of the sale"},
-            "Sales_Amount": {"type": "Float64", "description": "Total amount of the sale"},
-            "Quantity_Sold": {"type": "Int64", "description": "Number of units sold"},
-            "Product_Category": {"type": "String", "description": "Category of the product"},
-            "Unit_Cost": {"type": "Float64", "description": "Cost per unit"},
-            "Unit_Price": {"type": "Float64", "description": "Price per unit"},
-            "Customer_Type": {"type": "String", "description": "Type of customer (Retail, Wholesale, etc.)"},
-            "Discount": {"type": "Float64", "description": "Discount percentage applied"},
-            "Payment_Method": {"type": "String", "description": "Method of payment"},
-            "Sales_Channel": {"type": "String", "description": "Channel through which sale was made"},
-            "Region_and_Sales_Rep": {"type": "String", "description": "Combination of region and sales rep"}
-        }
-    
-    def _fetch_schema_from_db(self, table_name: str) -> Dict[str, Any]:
-        """Fetch schema information from database."""
-        from agent.query_executor import QueryExecutor
-        
-        # Create a query executor
-        executor = QueryExecutor(self.config)
-        
-        # Query to get schema information
-        query = f"""
-        SELECT 
-            name, 
-            type,
-            comment
-        FROM 
-            system.columns
-        WHERE 
-            table = '{table_name}'
-        """
-        
-        # Execute query
-        result = executor.execute_query(query)
-        
-        if not result:
-            raise ValueError(f"Could not retrieve schema for table {table_name}")
-        
-        # Convert result to schema dictionary
-        schema = {}
-        for row in result:
-            schema[row['name']] = {
-                "type": row['type'],
-                "description": row.get('comment', '')
-            }
-        
-        return schema
+            error_msg = f"Error fetching schema for {table_name}: {str(e)}"
+            if self.debug_mode:
+                logging.error(error_msg)
+            return {"error": error_msg}

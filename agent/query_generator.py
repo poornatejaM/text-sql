@@ -1,4 +1,3 @@
-# agent/query_generator.py
 import logging
 import lamini
 import re
@@ -26,6 +25,9 @@ class QueryGenerator:
     def generate_query(self, user_query: str, schema: Dict[str, Any], table_name: str) -> Optional[str]:
         """Generate a SQL query from natural language input."""
         try:
+            # Remove 'sample_data' key from schema
+            schema = {k: v for k, v in schema.items() if k != "sample_data"}
+            
             # Format schema for prompt
             schema_str = self._format_schema_for_prompt(schema)
             
@@ -82,7 +84,7 @@ class QueryGenerator:
         schema_str = ""
         for field_name, field_info in schema.items():
             field_type = field_info.get("type", "Unknown")
-            field_desc = field_info.get("description", "")
+            field_desc = field_info.get("comment", "")
             schema_str += f"- {field_name} ({field_type}): {field_desc}\n"
         
         return schema_str
@@ -151,7 +153,9 @@ class QueryGenerator:
                         "JOIN", "INNER", "OUTER", "LEFT", "RIGHT", "ON", "AS", "IN", 
                         "LIKE", "IS", "NOT", "NULL", "AND", "OR", "CASE", "WHEN", 
                         "THEN", "ELSE", "END", "LIMIT", "OFFSET", "DISTINCT", "COUNT",
-                        "SUM", "AVG", "MIN", "MAX", "WITH"}
+                        "SUM", "AVG", "MIN", "MAX", "ROUND", "DATE", "EXTRACT",
+                        "TO_CHAR", "TO_DATE", "CURRENT_DATE", "CURRENT_TIMESTAMP", 
+                        "LOWER", "UPPER", "TRIM", "SUBSTRING", "IF", "CASE"}
         
         sql_functions = {"COUNT", "SUM", "AVG", "MIN", "MAX", "ROUND", "DATE", "EXTRACT",
                          "TO_CHAR", "TO_DATE", "CURRENT_DATE", "CURRENT_TIMESTAMP", 

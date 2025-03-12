@@ -1,5 +1,23 @@
 [
     {
-        "COUNT()": 1000
+        "AppointmentID": 639,
+        "Date": "2022-04-08",
+        "Time": "2023-12-23 14:33:46.406000",
+        "PatientID": 109,
+        "DoctorID": 462
+    },
+    {
+        "AppointmentID": 404,
+        "Date": "2023-04-10",
+        "Time": "2023-12-23 14:33:46.407000",
+        "PatientID": 823,
+        "DoctorID": 774
+    },
+    {
+        "AppointmentID": 281,
+        "Date": "2022-12-09",
+        "Time": "2023-12-23 14:33:46.407000",
+        "PatientID": 465,
+        "DoctorID": 226
     }
 ]

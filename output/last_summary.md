@@ -1,6 +1,20 @@
-# Summary for: What is the total count of all doctors across all specialties and locations?
+# Summary for: What is the total count of unique doctors and patients in the database?
 
-**Total Count of Doctors Across All Specialties and Locations**
-===========================================================
+**Summary of Query Results**
+================================
 
-Based on the SQL results, we can see that there are a total of **1000** doctors across all specialties and locations. This comprehensive count encompasses all medical professionals, regardless of their area of expertise or geographical location. This number provides a broad overview of the total number of doctors in our dataset, offering a foundation for further analysis and exploration of specific trends and patterns.
+Based on the SQL results, we can see that there are:
+
+* **999 unique doctors** in the database.
+* **601 unique patients** in the database.
+
+**Key Insights**
+---------------
+
+The database contains a significant number of unique doctors, indicating a large medical staff. In contrast, the number of unique patients is relatively lower, suggesting a moderate patient base. This could be an opportunity for the medical practice to expand its patient outreach and engagement efforts.
+
+**Noteworthy Trends**
+--------------------
+
+* The ratio of doctors to patients is approximately 1.66:1, indicating a relatively high doctor-to-patient ratio.
+* The number of unique patients is approximately 60.5% of the number of unique doctors, suggesting a moderate level of patient engagement.

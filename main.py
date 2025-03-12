@@ -66,7 +66,7 @@ class SQLAgent:
                 task = progress.add_task("[cyan]Searching tables...", total=100)
                 
                 # Simulate progress while task runs in background
-                relevant_tables = self.table_finder.find_relevant_tables(enhanced_query)
+                relevant_tables = self.table_finder.identify_relevant_tables(enhanced_query)
                 
                 # Complete progress
                 progress.update(task, completed=100)
@@ -78,7 +78,7 @@ class SQLAgent:
                 table.add_column("Relevance Score")
                 table.add_column("Description")
                 
-                for table_info in relevant_tables[:5]:  # Show top 5
+                for table_info in relevant_tables:  # Show all relevant tables
                     table.add_row(
                         table_info["name"],
                         f"{table_info['score']:.2f}",
@@ -95,7 +95,7 @@ class SQLAgent:
                 console.print(f"[yellow]No relevant tables found. Using default: {table_name}[/yellow]")
         
         # Get schema for specified table
-        schema = self.schema_manager.get_schema(table_name)
+        schema = self.schema_manager.get_table_schema(table_name)
         
         if not schema:
             console.print(f"[bold red]Error:[/bold red] Schema not found for table '{table_name}'")
@@ -139,7 +139,7 @@ class SQLAgent:
         
         console.print("[bold red]Error:[/bold red] All query attempts failed.")
         return None
-
+    
 def main():
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='ClickHouse SQL Agent')
